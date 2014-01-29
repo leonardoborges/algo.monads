@@ -40,7 +40,7 @@
          ~'m-plus   ::undefined
          ~@operations]
      {:m-result ~'m-result
-      :m-bind ~'m-bind 
+      :m-bind ~'m-bind
       :m-zero ~'m-zero
       :m-plus ~'m-plus}))
 
@@ -211,13 +211,13 @@
             exprs           (map second options)
             ]
         `(do
-           (defsymbolmacro ~name (partial ~fn-name ~'m-bind ~'m-result 
+           (defsymbolmacro ~name (partial ~fn-name ~'m-bind ~'m-result
                                                    ~'m-zero ~'m-plus))
            (defn ~fn-name ~@(map make-fn-body arglists exprs))))
       ; single arity
       (let [[args expr] options]
         `(do
-           (defsymbolmacro ~name (partial ~fn-name ~'m-bind ~'m-result 
+           (defsymbolmacro ~name (partial ~fn-name ~'m-bind ~'m-result
                                                    ~'m-zero ~'m-plus))
            (defn ~fn-name ~@(make-fn-body args expr)))))))
 
@@ -517,8 +517,35 @@
 (defn censor [f mv]
   (let [[v a] mv] [v (f a)]))
 
-; Continuation monad
+; Reader monad
+(defmonad reader-m
+  "Monad describing computations which read values from a shared environment.
+  Also known as the environment monad."
+  [m-result  (fn [a]
+               (fn [_] a))
+   m-bind    (fn [m k]
+               (fn [r]
+                 ((k (m r)) r)))
+   ])
 
+(defn ask
+  "Returns the environment."
+  []
+  identity)
+
+(defn asks
+  "Returns a function of the current environment."
+  [f]
+  (fn [env]
+    (f env)))
+
+(defn local
+  "Runs reader g in the context of an environment modified by f"
+  [f g]
+  (fn [env]
+    (g (f env))))
+
+; Continuation monad
 (defmonad cont-m
   "Monad describing computations in continuation-passing style. The monadic
    values are functions that are called with a single argument representing
