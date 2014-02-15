@@ -90,9 +90,9 @@
         '((1 1) (2 0))
       ((m-lift 2 #(list %1 %2)) (range 3) (range 2))
         '((0 0) (0 1) (1 0) (1 1) (2 0) (2 1))
-      (m-seq (replicate 3 (range 2)))
+      (m-seq (repeat 3 (range 2)))
         '((0 0 0) (0 0 1) (0 1 0) (0 1 1) (1 0 0) (1 0 1) (1 1 0) (1 1 1))
-      ((m-chain (replicate 3 range)) 5)
+      ((m-chain (repeat 3 range)) 5)
         '(0 0 0 1 0 0 1 0 1 2)
       (m-plus (range 3) (range 2))
         '(0 1 2 0 1))))
@@ -126,6 +126,13 @@
                    b (m-result 2)]
                   (+ a b))
          [3 [:a :b]]))
+  (is (= (domonad (writer-m ())
+                  [_ (write :a)
+                   a (m-result 1)
+                   _ (write :b)
+                   b (m-result 2)]
+                  (+ a b))
+         [3 '(:a :b)]))
   (is (= (domonad (writer-m (list))
                   [_ (write :a)
                    a (m-result 1)
@@ -139,7 +146,57 @@
                    _ (write :a)
                    b (m-result 2)]
                   (+ a b))
-         [3 #{:a}])))
+         [3 #{:a}]))
+  (is (= (domonad (writer-m ())
+                  [_ (domonad
+                      [_ (write "foo")]
+                      nil)
+                   _ (write "bar")]
+                  1)
+         [1 '("foo" "bar")])))
+
+(deftest reader-monad
+  (let [monad-value (domonad reader-m
+                             [x (asks :number)]
+                             (* x 2))]
+    (is (= (monad-value {:number 3})
+           6)))
+
+  (let [monad-value (domonad reader-m
+                             [env (ask)]
+                             env)]
+    (is (= (monad-value "env")
+           "env")))
+
+  (let [monad-value (domonad reader-m
+                             [numbers (ask)
+                              sum  (m-result (reduce + numbers))
+                              mean (m-result (/ sum (count numbers)))]
+                             mean)]
+    (is (= (monad-value (range 1 10))
+           5)))
+
+  (let [monad-value (domonad reader-m
+                             [a (ask)
+                              b (local inc (ask))]
+                             (* a b))]
+    (is (= (monad-value 10)
+           110)))
+
+
+  (let [mult-a-b (fn []
+                   (domonad reader-m
+                            [a (asks :a)
+                             b (asks :b)]
+                            (* a b)))
+        monad-value (domonad reader-m
+                             [a  (asks :a)
+                              b  (asks :b)
+                              a* (local #(update-in % [:a] inc) (asks :a))
+                              c  (local #(assoc % :b 5)  (mult-a-b))]
+                             [a b a* c])]
+    (= (monad-value {:a 10})
+       [10 nil 11 50])))
 
 (deftest reader-monad
   (let [monad-value (domonad reader-m

@@ -34,10 +34,10 @@
    are written like bindings to the monad operations m-bind and
    m-result (required) and m-zero and m-plus (optional)."
   [operations]
-  `(let [~'m-bind   ::undefined
-         ~'m-result ::undefined
-         ~'m-zero   ::undefined
-         ~'m-plus   ::undefined
+  `(let [~'m-bind   ::this-monad-does-not-define-m-bind
+         ~'m-result ::this-monad-does-not-define-m-result
+         ~'m-zero   ::this-monad-does-not-define-m-zero
+         ~'m-plus   ::this-monad-does-not-define-m-plus
          ~@operations]
      {:m-result ~'m-result
       :m-bind ~'m-bind
@@ -359,7 +359,7 @@
    [m-zero   nil
     m-result (fn m-result-maybe [v] v)
     m-bind   (fn m-bind-maybe [mv f]
-               (if (nil? mv) nil (f mv)))
+               (when-not (nil? mv) (f mv)))
     m-plus   (fn m-plus-maybe [& mvs]
                (first (drop-while nil? mvs)))
     ])
@@ -482,7 +482,7 @@
 
   clojure.lang.IPersistentList
   (writer-m-add [c v] (conj c v))
-  (writer-m-combine [c1 c2] (concat c1 c2))
+  (writer-m-combine [c1 c2] (apply list (concat c1 c2)))
 
   clojure.lang.APersistentSet
   (writer-m-add [c v] (conj c v))
@@ -521,11 +521,11 @@
 (defmonad reader-m
   "Monad describing computations which read values from a shared environment.
   Also known as the environment monad."
-  [m-result  (fn [a]
-               (fn [_] a))
-   m-bind    (fn [m k]
+  [m-result  (fn m-result-reader [v]
+               (fn [r] v))
+   m-bind    (fn m-bind-reader [mv f]
                (fn [r]
-                 ((k (m r)) r)))
+                 ((f (mv r)) r)))
    ])
 
 (defn ask
@@ -586,7 +586,8 @@
    from the base monad or from the transformer."
   [base which-m-plus operations]
   `(let [which-m-plus# (cond (= ~which-m-plus :m-plus-default)
-                               (if (= ::undefined (with-monad ~base ~'m-plus))
+                             (if (= ::this-monad-does-not-define-m-plus
+                                    (with-monad ~base ~'m-plus))
                                  :m-plus-from-transformer
                                  :m-plus-from-base)
                              (or (= ~which-m-plus :m-plus-from-base)
@@ -676,13 +677,13 @@
                                  (fn [[v ss]]
                                    ((f v) ss))))))
           m-zero   (with-monad m
-                     (if (= ::undefined m-zero)
-                       ::undefined
+                     (if (= ::this-monad-does-not-define-m-zero m-zero)
+                       ::this-monad-does-not-define-m-zero
                        (fn [s]
                          m-zero)))
           m-plus   (with-monad m
-                     (if (= ::undefined m-plus)
-                       ::undefined
+                     (if (= ::this-monad-does-not-define-m-plus m-plus)
+                       ::this-monad-does-not-define-m-plus
                        (fn [& stms]
                          (fn [s]
                            (apply m-plus (map #(% s) stms))))))
